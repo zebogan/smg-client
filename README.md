@@ -1,10 +1,5 @@
 # smg-client
 
-in order to work, this code requires a file called `login.json` containing the following (replace values with your credentials):
-```json
-{
-    "ACCOUNTNO": "INSERT_USERNAME",
-    "USER_PIN": "INSERT_PASSWORD",
-    "SECURITY_STRING": ""
-}
-```
+on first run, the program will ask for your credentials. afterwards, it should just work
+
+depends: requests, xmltodict, tabulate
