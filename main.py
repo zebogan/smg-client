@@ -1,4 +1,20 @@
-import requests, json, os, re, xmltodict, time, tabulate, sys
+import requests, json, os, re, xmltodict, time, tabulate, sys, signal
+
+timeStats = {
+    "iteration": 0,
+    "totalNet": 0,
+    "totalProgram": 0,
+    "minNet": 0,
+    "maxNet": 0,
+    "minProgram": 0,
+    "maxProgram": 0
+}
+
+def quit(signal, frame):
+    print("Exiting")
+    sys.exit(0) 
+
+signal.signal(signal.SIGINT, quit)
 
 try:
     # open login creds
@@ -85,18 +101,18 @@ for j in hPriceXML['transactions']['record']:
 polygonSession = requests.Session()
 
 while True:
+    avgStats = [0, 0]
     start_time = time.time()
 
     # for piggybacking off of their polygon instance bc im lazy
-    # get info about current prices of holdings
-
     x = polygonSession.get(f"https://us-east-1.aws.data.mongodb-api.com/app/polygon-api-xtron/endpoint/summaries?tickers={symbols}")
+    
     request_time = time.time()
     y = json.loads(x.text)
     # sort by ticker instead of by name
     results = sorted(y['results'], key=lambda d: d['ticker'])
 
-    head = ["price", "change", "profit", "ticker", "purchase", "name", "updated"]
+    head = ["price", "change", "profit", "ticker", "purchase", "held", "name", "updated"]
     data = []
 
     for info in results:
@@ -105,27 +121,71 @@ while True:
         ticker = str(info['ticker'])
         updated = info['last_updated'] // 1000000000
         originalPrice = holdingsPrices[ticker]
+
         # calculate profit of each stock
-        profit = str((info['price'] - float(originalPrice)) * int(quantity[ticker]))
+        profit = str(round((info['price'] - float(originalPrice)) * int(quantity[ticker]), 2))
+
+        currentQuantity = quantity[ticker]
+        avgStats[0] += float(info['session']['change_percent'])
+        avgStats[1] += float(profit)
+
         if percent[0] == '-':
             # make red if negative
             percent = "\033[0;31m" + percent + "\033[0;0m"
         else:
             # make green
             percent = "\033[0;32m" + percent + "\033[0;0m"
+
         if updated != updates[results.index(info)]:
             # if updated since last refresh, make blue
             price = "\033[0;34m" + price + "\033[0;0m"
             ticker = "\033[0;34m" + ticker + "\033[0;0m"
             profit = "\033[0;34m" + profit + "\033[0;0m"
             updates[results.index(info)] = updated
-        data.append([price, percent, profit, ticker, originalPrice, str(info['name'])[0:50], time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(updated))])
-    
-    # make table and print
-    table = tabulate.tabulate(data, headers=head, tablefmt="outline", numalign="left")
-    os.system('clear')
-    print(table)
+
+        data.append([price, percent, profit, ticker, originalPrice, currentQuantity, str(info['name'])[0:50], time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(updated))])
+
+    avgStats[0] = round(avgStats[0], 4)
+    avgStats[0] = str(avgStats[0]) + "%"
+    if avgStats[0] == '-': 
+        # make red if negative
+        avgStats[0] = "\033[0;31m" + avgStats[0] + "\033[0;0m"
+    else:
+        # make green
+        avgStats[0] = "\033[0;32m" + avgStats[0] + "\033[0;0m"
+    data.append(["", avgStats[0], round(avgStats[1], 2)])
 
     final_time = time.time() - start_time
-    print(request_time - start_time)
-    print(final_time - (request_time - start_time))
+
+    timeStats['iteration'] += 1
+    timeStats['totalNet'] += round((request_time - start_time) * 1000, 0)
+    timeStats['totalProgram'] += round((final_time - (request_time - start_time)) * 1000000, 0)
+
+    if round((request_time - start_time) * 1000, 0) > timeStats['maxNet']:
+        timeStats['maxNet'] = round((request_time - start_time) * 1000, 0)
+    if round((request_time - start_time) * 1000, 0) < timeStats['minNet'] or timeStats['minNet'] == 0:
+        timeStats['minNet'] = round((request_time - start_time) * 1000, 0)
+
+    if round((final_time - (request_time - start_time)) * 1000000, 0) > timeStats['maxProgram']:
+        timeStats['maxProgram'] = round((final_time - (request_time - start_time)) * 1000000, 0)
+    if round((final_time - (request_time - start_time)) * 1000000, 0) < timeStats['minProgram'] or timeStats['minProgram'] == 0:
+        timeStats['minProgram'] = round((final_time - (request_time - start_time)) * 1000000, 0)
+
+    timeData = [
+        ["time", "current", "average", "min", "max"],
+        ["network", round((request_time - start_time) * 1000, 0), timeStats['totalNet'] // timeStats['iteration'], timeStats['minNet'], timeStats['maxNet']],
+        ["program", round((final_time - (request_time - start_time)) * 1000000, 0), timeStats['totalProgram'] // timeStats['iteration'], timeStats['minProgram'], timeStats['maxProgram']]
+    ]
+
+    timeData[1] = [str(i) + "ms" for i in timeData[1]]
+    timeData[1][0] = timeData[1][0][:-2]
+    timeData[2] = [str(i) + "us" for i in timeData[2]]
+    timeData[2][0] = timeData[2][0][:-2]
+
+    timeTable = tabulate.tabulate(timeData, headers="firstrow", tablefmt="rounded_outline")
+
+    # make table and print
+    table = tabulate.tabulate(data, headers=head, tablefmt="rounded_outline", numalign="left")
+    os.system('clear')
+    print(table)
+    print(timeTable)
