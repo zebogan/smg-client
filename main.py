@@ -1,4 +1,4 @@
-import requests, json, os, re, xmltodict, time, tabulate, sys, signal
+import requests, json, os, re, xmltodict, time, tabulate, sys
 
 timeStats = {
     "iteration": 0,
@@ -9,12 +9,6 @@ timeStats = {
     "minProgram": 0,
     "maxProgram": 0
 }
-
-def quit(signal, frame):
-    print("Exiting")
-    sys.exit(0) 
-
-signal.signal(signal.SIGINT, quit)
 
 try:
     # open login creds
