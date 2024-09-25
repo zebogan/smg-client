@@ -141,7 +141,7 @@ while True:
 
     avgStats[0] = round(avgStats[0], 4)
     avgStats[0] = str(avgStats[0]) + "%"
-    if avgStats[0] == '-': 
+    if avgStats[0][0] == '-': 
         # make red if negative
         avgStats[0] = "\033[0;31m" + avgStats[0] + "\033[0;0m"
     else:
