@@ -1,4 +1,4 @@
-import requests, json, os, re, xmltodict, time, tabulate, sys
+import requests, json, os, re, xmltodict, time, tabulate, sys, plotille
 
 timeStats = {
     "iteration": 0,
@@ -91,6 +91,9 @@ for j in hPriceXML['transactions']['record']:
     holdingsPrices[j['ticker']] = j['netcost_pershare']
     quantity[j['ticker']] = j['shares_value']
 
+profitHistory = []
+profitTimes = []
+
 # for speeding up polygon requests
 polygonSession = requests.Session()
 
@@ -149,6 +152,9 @@ while True:
         avgStats[0] = "\033[0;32m" + avgStats[0] + "\033[0;0m"
     data.append(["", avgStats[0], round(avgStats[1], 2)])
 
+    profitHistory.append(round(avgStats[1], 2))
+    profitTimes.append(time.time())
+
     final_time = time.time() - start_time
 
     timeStats['iteration'] += 1
@@ -177,9 +183,11 @@ while True:
     timeData[2][0] = timeData[2][0][:-2]
 
     timeTable = tabulate.tabulate(timeData, headers="firstrow", tablefmt="rounded_outline")
+    profitGraph = plotille.plot(profitTimes, profitHistory, height=20, width=60, interp="linear", lc="cyan")
 
     # make table and print
     table = tabulate.tabulate(data, headers=head, tablefmt="rounded_outline", numalign="left")
     os.system('clear')
     print(table)
     print(timeTable)
+    print(profitGraph)
